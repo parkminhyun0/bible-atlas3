@@ -114,7 +114,17 @@ export function buildStyle({ demUrl, placesUrl, demMaxZoom = 13 }) {
           ],
         },
       },
-      // 물은 고도색 **위**에 온다. 아래에 두면 고도색이 바다를 덮는다.
+      {
+        // **음영기복은 물보다 아래에 둔다.** 위에 두면 물을 회색으로 덮는다 —
+        // 실제로 갈릴리 호수가 회색으로 나왔다. 음영은 땅의 굴곡을 말하는 것이지
+        // 물에 얹을 것이 아니다. 순서가 곧 뜻이다.
+        id: 'hillshade',
+        type: 'hillshade',
+        source: 'terrain',
+        // 과장은 화면에만 쓴다. 측정은 언제나 1.0× 기하로 한다.
+        paint: { 'hillshade-exaggeration': 0.5, 'hillshade-shadow-color': '#6b6357' },
+      },
+      // 물은 고도색과 음영기복 **위**에 온다.
       { id: 'ocean', type: 'fill', source: 'water', 'source-layer': 'water',
         filter: ['==', ['get', 'class'], 'ocean'],
         paint: { 'fill-color': '#8fa9c4' } },
@@ -138,13 +148,6 @@ export function buildStyle({ demUrl, placesUrl, demMaxZoom = 13 }) {
             10, ['case', ['==', ['get', 'class'], 'river'], 1.6, 0.6],
             14, ['case', ['==', ['get', 'class'], 'river'], 3.0, 1.2]],
         } },
-      {
-        id: 'hillshade',
-        type: 'hillshade',
-        source: 'terrain',
-        // 과장은 화면에만 쓴다. 측정은 언제나 1.0× 기하로 한다.
-        paint: { 'hillshade-exaggeration': 0.5, 'hillshade-shadow-color': '#6b6357' },
-      },
       {
         id: 'place-dot',
         type: 'circle',
