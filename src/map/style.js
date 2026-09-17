@@ -30,8 +30,12 @@ export const TERRARIUM = {
 export function buildStyle({ demUrl, placesUrl, demMaxZoom = 13 }) {
   return {
     version: 8,
-    // 글꼴은 로컬에서 찾지 못하면 라벨이 통째로 사라진다. 출처를 못 박는다.
-    glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+    // **글꼴 출처를 잘못 잡으면 라벨이 사라지는 데서 끝나지 않는다.**
+    // 처음에 `demotiles.maplibre.org` 의 `Open Sans Regular` 를 썼는데 그곳에는
+    // `Open Sans Semibold` 밖에 없다. 모든 글리프 범위가 404 를 내자 지도가
+    // **`load` 도 `idle` 도 영영 내지 않았다** — 범례가 안 뜨고, 뒤에 달린 일이
+    // 전부 멈췄다. 라벨만 빠지는 게 아니라 화면 전체가 반쯤 죽는다.
+    glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
     sources: {
       terrain: { ...TERRARIUM, tiles: [demUrl], maxzoom: demMaxZoom },
       places: {
@@ -58,9 +62,11 @@ export function buildStyle({ demUrl, placesUrl, demMaxZoom = 13 }) {
         source: 'places',
         minzoom: 5,
         paint: {
-          'circle-radius': ['interpolate', ['linear'], ['zoom'], 6, 2.5, 12, 5],
-          'circle-color': '#ffffff',
-          'circle-stroke-color': '#222222',
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 6, 3, 12, 5.5],
+          // 흰 점 + 얇은 테두리는 밝은 음영기복 위에서 사실상 보이지 않는다.
+          // 실제로 갈릴리에서 80개가 그려졌는데도 화면에서는 한 개도 안 보였다.
+          'circle-color': '#8c3a22',
+          'circle-stroke-color': '#ffffff',
           // 굵기는 확실성에 쓰지 않는다 — 전부 같다(FGDC 가 .375 mm 로 통일한 까닭).
           'circle-stroke-width': 1.2,
           // 정확도를 모르는 자리는 옅게 둔다. 실선으로 그리지 않는다.
@@ -79,7 +85,9 @@ export function buildStyle({ demUrl, placesUrl, demMaxZoom = 13 }) {
               ['==', ['get', 'id_certainty'], 'uncertain'], ' ?',
               ['==', ['get', 'id_certainty'], 'less-certain'], ' (?)',
               '']],
-          'text-font': ['Open Sans Regular'],
+          // 이 출처에 실재하는 이름이어야 한다. 한글은 `localIdeographFontFamily`
+          // 가 기기 글꼴로 그리므로 여기에 한글 글꼴을 넣지 않는다.
+          'text-font': ['Noto Sans Regular'],
           'text-size': ['interpolate', ['linear'], ['zoom'], 6, 10, 12, 13],
           'text-offset': [0, 0.9],
           'text-anchor': 'top',
