@@ -24,6 +24,12 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      # 스타일을 브라우저 없이 검증한다. 화면이 비었을 때 '코드가 틀렸는가' 와
+      # '화면이 안 그려지는가' 를 구분해 주는 유일한 장치다.
+      - run: npm ci --no-audit --no-fund
+      - run: npm run check
       - uses: actions/configure-pages@v5
       # 모듈 주소에 버전 도장을 찍는다. GitHub Pages 가 max-age=600 을 보내므로
       # 도장이 없으면 고쳐 올려도 10분 동안 옛 코드가 돈다 — 실제로 겪었다.

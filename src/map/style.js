@@ -31,9 +31,7 @@ export const TERRARIUM = {
  * @param {string} opts.placesUrl 구운 지명 자료 주소
  * @param {number} opts.demMaxZoom 이 지역에 실제로 있는 최대 줌
  */
-export function buildStyle({ demUrl, placesUrl, waterBase, demMaxZoom = 13 }) {
-  const waterUrl = name => new URL(`water-${name}.json`, waterBase).href;
-
+export function buildStyle({ demUrl, placesUrl, demMaxZoom = 13 }) {
   return {
     version: 8,
     // **구형 지구.** 버전 1·2 가 하던 것이고 V3 도 이것으로 간다.
@@ -67,11 +65,28 @@ export function buildStyle({ demUrl, placesUrl, waterBase, demMaxZoom = 13 }) {
     sources: {
       terrain: { ...TERRARIUM, tiles: [demUrl], maxzoom: demMaxZoom },
       // 물. **고도만으로는 물과 마른 땅을 구분할 수 없어서** 따로 온다 —
-      // 여리고는 -258 m 인데 마른 땅이다. Natural Earth 1:10m, 퍼블릭 도메인.
-      ocean: { type: 'geojson', data: waterUrl('ocean'), maxzoom: 10 },
-      lakes: { type: 'geojson', data: waterUrl('lakes'), maxzoom: 12 },
-      rivers: { type: 'geojson', data: waterUrl('rivers'), maxzoom: 12 },
-      coastline: { type: 'geojson', data: waterUrl('coastline'), maxzoom: 12 },
+      // 여리고는 -258 m 인데 마른 땅이다.
+      //
+      // 처음에 Natural Earth 1:10m 를 썼다가 되돌렸다. 그것은 축척이
+      // **1:10,000,000** 이라 위치 한계가 약 1 km 다. 세계 지도용으로 **의도적으로
+      // 일반화된** 자료이므로 지구 뷰에서는 맞지만, 확대하면 해안선과 강이
+      // 각진 다각형이 된다. 자료가 그만큼밖에 없어서지 그리는 법이 틀려서가 아니다.
+      // (원본과 굽는 스크립트는 남겨 두었다 — 권리가 깨끗한 유일한 물 자료다.)
+      //
+      // 화면에는 OpenStreetMap 기반 벡터 타일(OpenFreeMap)을 쓴다. 버전 2 가
+      // 쓰던 것이고 z14 까지 있어 골목 수준에서도 매끄럽다.
+      //
+      // **라이선스 경계:** OSM 은 ODbL 이다. 우리는 그 타일을 **화면에 표시**할 뿐
+      // OSM 자료를 우리 자료에 합치거나 재배포하지 않는다. 우리가 굽는 파일
+      // (지명·AOI)에는 OSM 이 한 줄도 들어가지 않는다. 출처 표기는 반드시 남긴다.
+      water: {
+        type: 'vector',
+        url: 'https://tiles.openfreemap.org/planet',
+        attribution:
+          '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> 기여자 · ' +
+          '<a href="https://openfreemap.org">OpenFreeMap</a> · ' +
+          '<a href="https://www.openmaptiles.org/">OpenMapTiles</a>',
+      },
       places: {
         type: 'geojson',
         data: placesUrl,
@@ -100,18 +115,29 @@ export function buildStyle({ demUrl, placesUrl, waterBase, demMaxZoom = 13 }) {
         },
       },
       // 물은 고도색 **위**에 온다. 아래에 두면 고도색이 바다를 덮는다.
-      { id: 'ocean', type: 'fill', source: 'ocean',
-        paint: { 'fill-color': '#8fa9c4', 'fill-opacity': 0.92 } },
-      { id: 'lake', type: 'fill', source: 'lakes',
-        paint: { 'fill-color': '#8fa9c4', 'fill-opacity': 0.92 } },
-      { id: 'river', type: 'line', source: 'rivers', minzoom: 5,
+      { id: 'ocean', type: 'fill', source: 'water', 'source-layer': 'water',
+        filter: ['==', ['get', 'class'], 'ocean'],
+        paint: { 'fill-color': '#8fa9c4' } },
+      { id: 'lake', type: 'fill', source: 'water', 'source-layer': 'water',
+        filter: ['!=', ['get', 'class'], 'ocean'],
+        paint: { 'fill-color': '#8fa9c4' } },
+      { id: 'water-edge', type: 'line', source: 'water', 'source-layer': 'water',
+        minzoom: 6,
+        paint: { 'line-color': '#5f7d9c', 'line-width': 0.6, 'line-opacity': 0.6 } },
+      { id: 'river', type: 'line', source: 'water', 'source-layer': 'waterway',
+        minzoom: 5,
+        // 마른 와디까지 다 굵게 그으면 광야가 물길로 덮인다. 늘 흐르는 것과
+        // 간헐천(intermittent)을 갈라 놓는다 — 성경 무대에서는 이 구분이 크다.
+        filter: ['in', ['get', 'class'], ['literal', ['river', 'canal', 'stream']]],
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: {
           'line-color': '#7e9bb8',
-          'line-width': ['interpolate', ['linear'], ['zoom'], 5, 0.5, 10, 1.4, 14, 2.6],
+          'line-opacity': ['case', ['==', ['get', 'intermittent'], 1], 0.45, 1],
+          'line-width': ['interpolate', ['linear'], ['zoom'],
+            5, ['case', ['==', ['get', 'class'], 'river'], 0.6, 0],
+            10, ['case', ['==', ['get', 'class'], 'river'], 1.6, 0.6],
+            14, ['case', ['==', ['get', 'class'], 'river'], 3.0, 1.2]],
         } },
-      { id: 'coast', type: 'line', source: 'coastline', minzoom: 4,
-        paint: { 'line-color': '#5f7d9c', 'line-width': 0.7, 'line-opacity': 0.7 } },
       {
         id: 'hillshade',
         type: 'hillshade',

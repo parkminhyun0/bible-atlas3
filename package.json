@@ -1,0 +1,12 @@
+{
+  "name": "bible-atlas3",
+  "private": true,
+  "type": "module",
+  "description": "스타일 검증 전용. 실행에는 의존성이 없다 — index.html 은 그냥 열린다.",
+  "scripts": {
+    "check": "node scripts/check_style.mjs"
+  },
+  "devDependencies": {
+    "@maplibre/maplibre-gl-style-spec": "^24.0.0"
+  }
+}
