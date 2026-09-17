@@ -31,7 +31,9 @@ export const TERRARIUM = {
  * @param {string} opts.placesUrl 구운 지명 자료 주소
  * @param {number} opts.demMaxZoom 이 지역에 실제로 있는 최대 줌
  */
-export function buildStyle({ demUrl, placesUrl, demMaxZoom = 13 }) {
+export function buildStyle({ demUrl, placesUrl, waterBase, demMaxZoom = 13 }) {
+  const waterUrl = name => new URL(`water-${name}.json`, waterBase).href;
+
   return {
     version: 8,
     // **구형 지구.** 버전 1·2 가 하던 것이고 V3 도 이것으로 간다.
@@ -64,6 +66,12 @@ export function buildStyle({ demUrl, placesUrl, demMaxZoom = 13 }) {
     glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
     sources: {
       terrain: { ...TERRARIUM, tiles: [demUrl], maxzoom: demMaxZoom },
+      // 물. **고도만으로는 물과 마른 땅을 구분할 수 없어서** 따로 온다 —
+      // 여리고는 -258 m 인데 마른 땅이다. Natural Earth 1:10m, 퍼블릭 도메인.
+      ocean: { type: 'geojson', data: waterUrl('ocean'), maxzoom: 10 },
+      lakes: { type: 'geojson', data: waterUrl('lakes'), maxzoom: 12 },
+      rivers: { type: 'geojson', data: waterUrl('rivers'), maxzoom: 12 },
+      coastline: { type: 'geojson', data: waterUrl('coastline'), maxzoom: 12 },
       places: {
         type: 'geojson',
         data: placesUrl,
@@ -91,6 +99,19 @@ export function buildStyle({ demUrl, placesUrl, demMaxZoom = 13 }) {
           ],
         },
       },
+      // 물은 고도색 **위**에 온다. 아래에 두면 고도색이 바다를 덮는다.
+      { id: 'ocean', type: 'fill', source: 'ocean',
+        paint: { 'fill-color': '#8fa9c4', 'fill-opacity': 0.92 } },
+      { id: 'lake', type: 'fill', source: 'lakes',
+        paint: { 'fill-color': '#8fa9c4', 'fill-opacity': 0.92 } },
+      { id: 'river', type: 'line', source: 'rivers', minzoom: 5,
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': '#7e9bb8',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 5, 0.5, 10, 1.4, 14, 2.6],
+        } },
+      { id: 'coast', type: 'line', source: 'coastline', minzoom: 4,
+        paint: { 'line-color': '#5f7d9c', 'line-width': 0.7, 'line-opacity': 0.7 } },
       {
         id: 'hillshade',
         type: 'hillshade',

@@ -48,6 +48,7 @@ function start(aoi) {
     style: buildStyle({
       demUrl: aoi.dem_url,
       placesUrl: new URL(aoi.places, AOI_URL).href,
+      waterBase: new URL('data/water/', location.href).href,
       demMaxZoom: aoi.dem_max_zoom,
     }),
     center: aoi.center,
