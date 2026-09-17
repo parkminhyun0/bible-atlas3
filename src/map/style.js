@@ -7,6 +7,7 @@
  */
 
 import { dashExpression } from '../lib/certainty.js';
+import { LEVANT_RELIEF } from './palette.js';
 
 /** Terrarium 인코딩. `R*256 + G + B/256 - 32768`. */
 export const TERRARIUM = {
@@ -74,6 +75,22 @@ export function buildStyle({ demUrl, placesUrl, demMaxZoom = 13 }) {
     },
     layers: [
       { id: 'bg', type: 'background', paint: { 'background-color': '#f4f1ea' } },
+      {
+        // **고도색.** `color-relief` 는 DEM 값을 그대로 색으로 바꾼다 —
+        // 우리가 따로 구울 것이 없다. 배색은 palette.js 에 있고 초록을 쓰지 않는다.
+        id: 'relief',
+        type: 'color-relief',
+        source: 'terrain',
+        paint: {
+          'color-relief-color': LEVANT_RELIEF,
+          // 멀리서는 또렷하게, 가까이서는 옅게 — 가까이서는 등고선과 지명이
+          // 주인공이고 색은 배경이어야 한다(22번 문서의 공중원근).
+          'color-relief-opacity': [
+            'interpolate', ['linear'], ['zoom'],
+            0, 1, 8, 0.9, 12, 0.55, 14, 0.4,
+          ],
+        },
+      },
       {
         id: 'hillshade',
         type: 'hillshade',

@@ -33,3 +33,13 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
 /* 정직성 캡션 — 22번 문서가 요구하는 고정 6항목이 들어갈 자리. */
 .caption { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line);
   color: var(--ink-soft); font-size: 12px; }
+
+/* 고도 띠와 눈금 */
+.relief-band { height: 12px; border-radius: 2px; border: 1px solid var(--line); }
+.relief-ticks { position: relative; height: 30px; margin-top: 2px;
+  font-size: 11px; color: var(--ink-soft); }
+.relief-ticks .tick { position: absolute; transform: translateX(-50%);
+  text-align: center; white-space: nowrap; }
+.relief-ticks .tick i { display: block; width: 1px; height: 4px;
+  background: var(--line); margin: 0 auto 1px; }
+.relief-ticks .tick small { font-size: 10px; }
