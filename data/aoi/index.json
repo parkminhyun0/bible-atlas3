@@ -1,0 +1,34 @@
+{
+  "aois": [
+    {
+      "id": "jerusalem",
+      "ko": "예루살렘",
+      "places": "jerusalem.places.json",
+      "center": [
+        35.2345,
+        31.7784
+      ],
+      "zoom": 12.5,
+      "dem_url": "https://tiles.mapterhorn.com/{z}/{x}/{y}.webp",
+      "dem_max_zoom": 13,
+      "source_res": "ASTER GDEM 30 m 를 10 m 로 재격자화한 것",
+      "caption_note": "이 구역의 DEM 은 이름만 10 m 이고 실제 센서 해상도는 30 m 다 (Mapterhorn source-catalog/isr10 의 producer 표기). 양자화 눈금은 z12 에서 1/16 m.",
+      "count": 144
+    },
+    {
+      "id": "galilee",
+      "ko": "갈릴리",
+      "places": "galilee.places.json",
+      "center": [
+        35.55,
+        32.83
+      ],
+      "zoom": 10.5,
+      "dem_url": "https://tiles.mapterhorn.com/{z}/{x}/{y}.webp",
+      "dem_max_zoom": 13,
+      "source_res": "ASTER GDEM 30 m 를 10 m 로 재격자화한 것",
+      "caption_note": "예루살렘과 같은 자료다. 명목 10 m · 실제 30 m.",
+      "count": 88
+    }
+  ]
+}

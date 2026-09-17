@@ -1,0 +1,30 @@
+/* 색은 토큰으로 둔다 — 22번 문서의 배색 규약이 정해지면 여기만 고친다. */
+:root {
+  --bg: #f4f1ea;
+  --ink: #222;
+  --ink-soft: #666;
+  --panel: rgba(255, 255, 255, 0.94);
+  --line: #cfc8ba;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif; }
+#map { position: absolute; inset: 0; }
+
+#legend, #banner {
+  position: absolute; z-index: 2; background: var(--panel); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px;
+  max-width: min(320px, calc(100vw - 24px));
+}
+#legend { left: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); }
+#banner { left: 12px; right: 12px; top: calc(12px + env(safe-area-inset-top)); }
+#banner[data-kind="error"] { border-color: #b4441f; }
+
+.legend-title { font-weight: 600; margin-bottom: 6px; }
+.legend-row { display: flex; align-items: center; gap: 8px; margin: 3px 0; }
+.legend-row small { color: var(--ink-soft); }
+.swatch { width: 26px; height: 0; border-top-width: 2px; border-top-color: var(--ink); flex: none; }
+
+/* 정직성 캡션 — 22번 문서가 요구하는 고정 6항목이 들어갈 자리. */
+.caption { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line);
+  color: var(--ink-soft); font-size: 12px; }
