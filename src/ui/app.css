@@ -9,7 +9,12 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
   font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif; }
-#map { position: absolute; inset: 0; }
+/* 별은 지도 뒤에 깔린다. 지구 밖 빈 곳에서만 보인다. */
+#stars { position: absolute; inset: 0; z-index: 0; display: block;
+  width: 100%; height: 100%; transition: opacity 400ms linear; }
+#map { position: absolute; inset: 0; z-index: 1; background: transparent; }
+/* 지구 밖이 투명해야 별이 비친다. */
+.maplibregl-canvas { background: transparent; }
 
 #legend, #banner {
   position: absolute; z-index: 2; background: var(--panel); color: var(--ink);

@@ -12,7 +12,10 @@ import { dashExpression } from '../lib/certainty.js';
 export const TERRARIUM = {
   type: 'raster-dem',
   encoding: 'terrarium',
-  tileSize: 256,
+  // **512 다.** 내려받아 디코딩해 확인했다(512×512, z2 고도 -345~6288 m).
+  // 256 으로 선언하면 MapLibre 가 한 단계 어긋난 줌을 요청하고 고도 규모도
+  // 어긋난다 — 오류는 나지 않고 결과만 조용히 틀린다.
+  tileSize: 512,
   // **maxzoom 을 반드시 못 박는다.** 기본값 22 로 두면 없는 줌을 만들어 내려다
   // 메모리를 태운다. 실제 있는 것은 지역마다 다르다 — 자료에 적힌 값을 넣는다.
   maxzoom: 13,
@@ -30,6 +33,28 @@ export const TERRARIUM = {
 export function buildStyle({ demUrl, placesUrl, demMaxZoom = 13 }) {
   return {
     version: 8,
+    // **구형 지구.** 버전 1·2 가 하던 것이고 V3 도 이것으로 간다.
+    // 낮은 줌에서는 공처럼, 가까이 가면 저절로 평면처럼 보인다 —
+    // MapLibre 가 줌에 따라 알아서 섞는다.
+    projection: { type: 'globe' },
+    // 하늘·대기·안개. 지구 밖 빈 곳의 색이 여기서 정해진다.
+    // MapLibre 6 에는 `star-intensity` 가 없으므로 별은 우리가 따로 그린다.
+    sky: {
+      'sky-color': '#0a1330',
+      'sky-horizon-blend': 0.55,
+      'horizon-color': '#8fb2d8',
+      'horizon-fog-blend': 0.6,
+      'fog-color': '#d8e2ee',
+      'fog-ground-blend': 0.7,
+      // 0 이면 우주에서도 대기가 안 보이고, 1 이면 지표에서도 뿌옇다.
+      'atmosphere-blend': [
+        'interpolate', ['linear'], ['zoom'],
+        0, 0.9,     // 우주 — 지구 가장자리에 파란 테가 선다
+        4, 0.6,
+        8, 0.15,    // 지역 — 거의 걷힌다
+        12, 0,
+      ],
+    },
     // **글꼴 출처를 잘못 잡으면 라벨이 사라지는 데서 끝나지 않는다.**
     // 처음에 `demotiles.maplibre.org` 의 `Open Sans Regular` 를 썼는데 그곳에는
     // `Open Sans Semibold` 밖에 없다. 모든 글리프 범위가 404 를 내자 지도가

@@ -10,8 +10,28 @@ import maplibregl from './lib/maplibre.js';
 import { buildStyle } from './map/style.js';
 import { renderLegend } from './ui/legend.js';
 import { banner, clearBanner } from './ui/banner.js';
+import { drawStarfield, starOpacityForZoom } from './ui/starfield.js';
 
 const AOI_URL = new URL('data/aoi/index.json', location.href);
+
+/** 지형 과장. 22번 문서 규약: 기본 1.5× · 상한 2.5× · 항상 밝힌다. */
+const TERRAIN_EXAGGERATION = 1.5;
+
+/**
+ * 우주에서 그 자리로 들어간다.
+ *
+ * 한 번에 날아가면 어디로 가는지 알 수 없다. **두 걸음으로 나눈다** —
+ * 먼저 지구를 돌려 그 반구를 보여 주고(무대가 어디인지), 그 다음 내려앉는다.
+ * 내려앉을 때 기울기를 주어 땅이 솟은 것이 보이게 한다.
+ */
+function startFlight(map, aoi) {
+  map.flyTo({ center: aoi.center, zoom: 2.6, pitch: 0, bearing: 0,
+              duration: 3200, essential: true });
+  map.once('moveend', () => {
+    map.flyTo({ center: aoi.center, zoom: aoi.zoom, pitch: 58, bearing: -18,
+                duration: 4200, essential: true, curve: 1.3 });
+  });
+}
 
 async function loadAoi(name) {
   const res = await fetch(AOI_URL);
@@ -31,7 +51,10 @@ function start(aoi) {
       demMaxZoom: aoi.dem_max_zoom,
     }),
     center: aoi.center,
-    zoom: aoi.zoom,
+    // **우주에서 시작한다.** 곧바로 AOI 로 날아간다(startFlight).
+    // 주소에 #줌/위도/경도 가 있으면 그쪽이 이긴다 — 링크를 받은 사람은
+    // 그 자리를 보려는 것이지 연출을 보려는 것이 아니다.
+    zoom: location.hash ? aoi.zoom : 0.35,
     maxZoom: aoi.dem_max_zoom + 2,   // 자료가 없는 줌까지 열어 두지 않는다
     hash: true,
     // 한글 라벨은 기기 글꼴로 그린다 — 글리프 서버에 한글을 요구하지 않는다.
@@ -54,7 +77,40 @@ function start(aoi) {
     shownRes: `z${aoi.dem_max_zoom} 까지`,
     note: aoi.caption_note || '',
   });
-  map.on('load', clearBanner);
+  // **`load` 가 아니라 `styledata` 에 건다.**
+  //
+  // `load` 는 첫 렌더 프레임까지 기다리므로, 화면이 보이지 않는 상태에서는
+  // (배경 탭 등 `requestAnimationFrame` 이 멈춘 곳) 영영 나지 않는다.
+  // 지형을 올리는 데 필요한 것은 렌더가 아니라 **스타일 파싱**뿐이다.
+  // `isStyleLoaded()` 를 기다리는 것도 답이 아니다 — 그것은 타일까지 다 받아야
+  // 참이 되어 우주 줌에서 15초를 넘긴다.
+  //
+  // (앞서 이것을 'load 가 나지 않는 버그' 로 잘못 진단했다. 실제로는 자동화
+  //  브라우저의 탭이 `hidden` 이라 rAF 가 초당 0프레임이었다. 다만 `styledata`
+  //  에 거는 쪽이 어느 경우에도 더 튼튼하므로 그대로 둔다.)
+  map.once('styledata', () => {
+    try {
+      // **진짜 3D 지형.** 음영기복은 그림자일 뿐이고, 이것이 땅을 들어올린다.
+      // 과장은 화면에만 쓴다 — 거리·경사 계산은 언제나 1.0× 기하로 한다.
+      map.setTerrain({ source: 'terrain', exaggeration: TERRAIN_EXAGGERATION });
+    } catch (e) {
+      banner(`지형을 올리지 못했습니다 — ${e.message}`, 'error');
+    }
+  });
+  map.once('idle', clearBanner);
+
+  // 비행은 지형과 무관하다. 지형이 늦어도 화면은 먼저 움직인다.
+  if (!location.hash) startFlight(map, aoi);
+
+  // 별은 지도 캔버스 뒤에 깔린다. 줌이 올라가면 대기가 덮으므로 흐려 준다.
+  const stars = document.getElementById('stars');
+  if (stars) {
+    drawStarfield(stars);
+    const syncStars = () => { stars.style.opacity = starOpacityForZoom(map.getZoom()); };
+    syncStars();
+    map.on('move', syncStars);
+    window.addEventListener('resize', () => { drawStarfield(stars); syncStars(); });
+  }
 
   // WebGL 문맥이 날아가면 흰 화면만 남는다. 무슨 일인지 말해 준다.
   map.getCanvas().addEventListener('webglcontextlost', ev => {
