@@ -25,8 +25,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      # 모듈 주소에 버전 도장을 찍는다. GitHub Pages 가 max-age=600 을 보내므로
+      # 도장이 없으면 고쳐 올려도 10분 동안 옛 코드가 돈다 — 실제로 겪었다.
+      - run: python3 scripts/stamp_version.py
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: ./dist
       - id: deployment
         uses: actions/deploy-pages@v4
