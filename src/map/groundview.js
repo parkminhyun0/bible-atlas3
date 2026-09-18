@@ -33,10 +33,24 @@ export const EYE_HEIGHT_M = 1.7;
 /** 얼마나 앞을 보는가(m). 너무 가까우면 땅만, 너무 멀면 기울기가 눕는다. */
 const LOOK_AHEAD_M = 900;
 
-/** 지면 고도를 읽는다. 타일이 아직이면 null — 그때는 서지 않는다. */
+/**
+ * 지면 고도를 읽는다. 타일이 아직이면 null — 그때는 서지 않는다.
+ *
+ * **함정: `queryTerrainElevation` 은 과장이 걸린 값을 돌려준다.**
+ * 실측으로 확인했다 — 감람산에서 과장 1.5× 일 때 1,199 m, 1.0× 일 때 801 m,
+ * 비율 정확히 1.497. 과장을 켜 둔 채 이 값을 쓰면 카메라가 실제보다 400 m
+ * 높이 뜨고, 그 높이를 화면에 적으면 그대로 거짓말이 된다.
+ *
+ * 그래서 서서 보기는 **과장을 1.0 으로 되돌린 뒤에** 읽는다(enterGroundView).
+ */
 function groundAt(map, lngLat) {
   const e = map.queryTerrainElevation(lngLat);
   return typeof e === 'number' && isFinite(e) ? e : null;
+}
+
+/** 서서 보기에서 읽은 지면 고도. 과장 1.0 기준이므로 그대로 적어도 된다. */
+export function trueElevationAt(map, lngLat) {
+  return groundAt(map, { lng: lngLat[0], lat: lngLat[1] });
 }
 
 /** 방위각 bearing 으로 distM 만큼 간 자리. */

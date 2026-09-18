@@ -14,7 +14,7 @@ import { drawStarfield, starOpacityForZoom } from './ui/starfield.js';
 import { prepareContours } from './map/contours.js';
 import { showPopup, hidePopup } from './ui/popup.js';
 import { showGroundBar, hideGroundBar } from './ui/groundbar.js';
-import { enterGroundView, turn } from './map/groundview.js';
+import { enterGroundView, turn, trueElevationAt } from './map/groundview.js';
 
 const AOI_URL = new URL('data/aoi/index.json', location.href);
 
@@ -65,15 +65,17 @@ function start(aoi, contour) {
     // 보인다 — 기울이려면 오른쪽 드래그를 해야 하는데 그것을 아는 사람은 드물다.
     // 주소에 pitch 가 있으면 그쪽이 이긴다.
     pitch: 55,
-    // 85° 까지 연다. 기본 상한(60°)으로는 '서서 보기' 가 불가능하다 —
-    // 눈높이 시점은 거의 수평이다.
-    maxPitch: 85,
     hash: true,
     // 한글 라벨은 기기 글꼴로 그린다 — 글리프 서버에 한글을 요구하지 않는다.
     localIdeographFontFamily: "'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif",
     // 아이폰에서 죽던 자리. 픽셀 비율을 올리면 같은 화면에 4배 메모리를 쓴다.
     pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
   });
+
+  // **생성자의 `maxPitch` 는 먹지 않는다.** 85 로 넣었는데 `getMaxPitch()` 가
+  // 60 을 돌려주는 것을 실측으로 확인했다. `setMaxPitch()` 는 먹는다.
+  // 기본 상한 60° 로는 '서서 보기' 가 불가능하다 — 눈높이 시점은 거의 수평이다.
+  map.setMaxPitch(85);
 
   map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
   map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-right');
@@ -172,8 +174,11 @@ async function goGround(map, lngLat, name) {
   }
   clearBanner();
   hidePopup();
+  // 고도는 **과장 1.0 기준**으로 읽은 값이다. 서서 보기는 과장을 되돌린 뒤
+  // 서므로 그대로 적어도 된다 — 과장이 걸린 값을 적으면 거짓말이 된다.
+  const elev = trueElevationAt(map, lngLat);
   showGroundBar({
-    where: name,
+    where: name + (elev !== null ? ` · 해발 ${Math.round(elev)} m` : ''),
     bearing,
     onTurn: b => { bearing = b; turn(map, lngLat, b); },
     onExit: () => {
