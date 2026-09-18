@@ -15,6 +15,8 @@ import { prepareContours } from './map/contours.js';
 import { showPopup, hidePopup } from './ui/popup.js';
 import { showGroundBar, hideGroundBar } from './ui/groundbar.js';
 import { enterGroundView, turn, trueElevationAt } from './map/groundview.js';
+import { mountTimeline, yearKo } from './ui/timeline.js';
+import { applyTimeFilter } from './map/timefilter.js';
 
 const AOI_URL = new URL('data/aoi/index.json', location.href);
 
@@ -145,6 +147,20 @@ function start(aoi, contour) {
     map.on('mouseenter', id, () => { map.getCanvas().style.cursor = 'pointer'; });
     map.on('mouseleave', id, () => { map.getCanvas().style.cursor = ''; });
   }
+
+  // ── 3층 · 때 ──────────────────────────────────────────────────────
+  //
+  // "기원전 1000년의 지도" 를 그린다. 다만 연대를 아는 곳이 예루살렘 4% ·
+  // 갈릴리 24% 뿐이라, 거르는 순간 화면의 대부분이 **거짓 부재**가 된다.
+  // 그래서 연대를 모르는 곳은 숨기지 않고 옅게 두고, 숫자를 항상 함께 보인다.
+  mountTimeline({
+    onChange: ({ enabled, year, setCount }) => {
+      const c = applyTimeFilter(map, { enabled, year });
+      if (!enabled || !c) { setCount(''); return; }
+      setCount(`${yearKo(year)} — 있었다고 확인된 곳 ${c.present} · ` +
+               `그때는 없던 곳 ${c.absent} · 연대를 모르는 곳 ${c.unknown}`);
+    },
+  });
 
   // WebGL 문맥이 날아가면 흰 화면만 남는다. 무슨 일인지 말해 준다.
   map.getCanvas().addEventListener('webglcontextlost', ev => {
