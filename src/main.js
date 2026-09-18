@@ -53,6 +53,7 @@ function start(aoi, contour) {
       contour,
       demUrl: aoi.dem_url,
       demMaxZoom: aoi.dem_max_zoom,
+      lakesUrl: new URL('data/water/water-lakes.json', location.href).href,
     }),
     center: aoi.center,
     // **우주에서 시작한다.** 곧바로 AOI 로 날아간다(startFlight).
@@ -201,6 +202,7 @@ loadAoi(new URLSearchParams(location.search).get('aoi'))
     const contour = await prepareContours({
       demUrl: aoi.dem_url,
       demMaxZoom: aoi.dem_max_zoom,
+      lakesUrl: new URL('data/water/water-lakes.json', location.href).href,
       intervalM: aoi.contour_interval_m,
     });
     return start(aoi, contour);

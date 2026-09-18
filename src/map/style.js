@@ -38,7 +38,8 @@ export const TERRARIUM = {
  * @param {number} opts.demMaxZoom 이 지역에 실제로 있는 최대 줌
  * @param {{url:string,maxzoom:number}|null} opts.contour 등고선 소스. 없으면 없는 채로 그린다
  */
-export function buildStyle({ demUrl, demMaxZoom = 13, contour = null }) {
+export function buildStyle({ demUrl, demMaxZoom = 13, contour = null,
+                             lakesUrl = 'data/water/water-lakes.json' }) {
   return {
     version: 8,
     // **구형 지구.** 버전 1·2 가 하던 것이고 V3 도 이것으로 간다.
@@ -89,6 +90,12 @@ export function buildStyle({ demUrl, demMaxZoom = 13, contour = null }) {
           '<a href="https://openfreemap.org">OpenFreeMap</a> · ' +
           '<a href="https://www.openmaptiles.org/">OpenMapTiles</a>',
       },
+      // 우리가 고른 호수. Natural Earth 1:10m 에서 20세기 댐 저수지를 이름과
+      // 연대로 가려낸 것이다(build_water.py). 퍼블릭 도메인.
+      lakes: {
+        type: 'geojson', data: lakesUrl, maxzoom: 12,
+        attribution: '호수: <a href="https://www.naturalearthdata.com/">Natural Earth</a> (퍼블릭 도메인)',
+      },
       // 등고선은 **처음부터 스타일 안에** 둔다. 버전 2 는 켤 때 addSource 를
       // 불렀다가 스타일 로딩과 경합해 라이브에서 끝내 켜지지 않았다.
       ...(contour ? { contours: { type: 'vector', tiles: [contour.url],
@@ -133,35 +140,78 @@ export function buildStyle({ demUrl, demMaxZoom = 13, contour = null }) {
         paint: { 'color-relief-color': BATHY_RAMP },
       },
       {
+        // ── 음영 ①: 부드러운 바탕 (Igor 기법) ──────────────────────────
+        //
         // **음영기복은 물보다 아래에 둔다.** 위에 두면 물을 회색으로 덮는다 —
-        // 실제로 갈릴리 호수가 회색으로 나왔다. 음영은 땅의 굴곡을 말하는 것이지
-        // 물에 얹을 것이 아니다. 순서가 곧 뜻이다.
+        // 실제로 갈릴리 호수가 회색으로 나왔다. 순서가 곧 뜻이다.
+        //
+        // `igor` 는 Igor Drecki 의 기법으로, 그늘을 **검게 만들지 않고** 부드럽게
+        // 낮춘다. 고도색 위에 얹어도 색을 죽이지 않아 지도책의 음영에 가깝다.
+        // 기본 `standard` 는 대비가 세서 색을 회색으로 밀어 버린다.
         id: 'hillshade',
         type: 'hillshade',
         source: 'terrain',
-        // 과장은 화면에만 쓴다. 측정은 언제나 1.0× 기하로 한다.
-        paint: { 'hillshade-exaggeration': 0.5, 'hillshade-shadow-color': '#6b6357' },
+        paint: {
+          'hillshade-method': 'igor',
+          // 과장은 화면에만 쓴다. 측정은 언제나 1.0× 기하로 한다.
+          'hillshade-exaggeration': 0.45,
+          'hillshade-shadow-color': '#6b6357',
+          'hillshade-highlight-color': '#fffdf6',
+          'hillshade-accent-color': '#8a7f6e',
+          // **빛은 화면이 아니라 지도에 고정한다.** 기본값(`viewport`)이면
+          // 지도를 돌릴 때 해가 같이 돌아 산이 뒤집혀 보인다.
+          // 지도책의 관습은 왼쪽 위(북서)에서 오는 빛이다.
+          'hillshade-illumination-anchor': 'map',
+          'hillshade-illumination-direction': 315,
+          'hillshade-illumination-altitude': 45,
+        },
+      },
+      {
+        // ── 음영 ②: 능선을 집어내는 다방향 음영 ────────────────────────
+        //
+        // 빛이 한 방향이면 그 방향과 나란한 능선은 **평평하게 보인다.**
+        // 다방향 음영은 여러 방위에서 비춰 그 손실을 메운다 — swisstopo·USGS
+        // 계열이 쓰는 기법이다. 옅게 얹어 ① 의 부드러움을 깨지 않는다.
+        id: 'hillshade-multi',
+        type: 'hillshade',
+        source: 'terrain',
+        paint: {
+          'hillshade-method': 'multidirectional',
+          'hillshade-exaggeration': ['interpolate', ['linear'], ['zoom'],
+            4, 0.10, 9, 0.22, 13, 0.30],
+          'hillshade-shadow-color': '#5e564a',
+          'hillshade-highlight-color': 'rgba(255,255,255,0)',
+          'hillshade-illumination-anchor': 'map',
+        },
       },
       // 물은 고도색과 음영기복 **위**에 온다.
       { id: 'ocean', type: 'fill', source: 'water', 'source-layer': 'water',
         filter: ['==', ['get', 'class'], 'ocean'],
         paint: { 'fill-color': SEA_FLAT } },
       {
-        // **호수와 강의 수면만.** 처음에 `class != ocean` 으로 두었더니
-        // `pond`·`swimming_pool`·`dock` 까지 끌려와, 벧산·이스르엘 골짜기의
-        // **현대 양어장과 저수지가 파란 격자로 온 들판을 덮었다.**
-        // 성경 시대 지도에 20세기 양식장을 그리는 셈이다.
+        // **호수는 우리가 고른 것만 그린다.**
         //
-        // 버전 2 는 이 함정을 이미 피해 있었다 — `class == 'lake'` 로 **같음**을
-        // 썼다. 같은 실수를 되풀이하지 않는다.
-        id: 'lake', type: 'fill', source: 'water', 'source-layer': 'water',
-        filter: ['in', ['get', 'class'], ['literal', ['lake', 'river']]],
+        // OSM 을 쓰면 안 된다는 것을 실측으로 확인했다. 갈릴리 일대에서 호수로
+        // 분류된 279개 중 **269개가 1 km² 미만**이었다(중앙값 0.083 km² = 8헥타르).
+        // 벧산·이스르엘 골짜기의 양어장과 저수지다. 속성으로는 자연호와 구분되지
+        // 않는다 — OSM 은 저수지도 `lake` 로 분류한다.
+        //
+        // 그래서 Natural Earth 1:10m 를 쓰고, 거기서 **20세기 댐 저수지를 이름과
+        // 연대로 가려냈다**(`build_water.py` 의 `MODERN_WATER`). 나세르호·앗사드호·
+        // 아타튀르크호 같은 것들은 성경 시대에 없던 물이고, 그리면 그 아래 잠긴
+        // 유적과 옛 물길을 지우는 일이 된다.
+        //
+        // 대가는 모양이 거칠어지는 것이다(1:10m 는 위치 한계 약 1 km).
+        // 갈릴리 호수 하나를 매끄럽게 그리는 것보다 **없던 물을 그리지 않는 것**이
+        // 이 지도에서는 더 중요하다.
+        id: 'lake', type: 'fill', source: 'lakes',
         paint: { 'fill-color': SEA_FLAT } },
-      { id: 'water-edge', type: 'line', source: 'water', 'source-layer': 'water',
-        minzoom: 6,
-        // 테두리도 같은 잣대로 — 양어장 테두리를 그리면 없앤 뜻이 없다.
-        filter: ['in', ['get', 'class'], ['literal', ['lake', 'river', 'ocean']]],
+      { id: 'lake-edge', type: 'line', source: 'lakes', minzoom: 6,
         paint: { 'line-color': '#2a6aa5', 'line-width': 0.6, 'line-opacity': 0.55 } },
+      { id: 'coast-edge', type: 'line', source: 'water', 'source-layer': 'water',
+        minzoom: 5,
+        filter: ['==', ['get', 'class'], 'ocean'],
+        paint: { 'line-color': '#2a6aa5', 'line-width': 0.7, 'line-opacity': 0.6 } },
       { id: 'river', type: 'line', source: 'water', 'source-layer': 'waterway',
         minzoom: 5,
         // **운하를 그리지 않는다.** OSM 의 `canal` 은 대부분 현대 관개수로다 —
