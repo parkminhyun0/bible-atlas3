@@ -146,25 +146,37 @@ export function buildStyle({ demUrl, demMaxZoom = 13, contour = null }) {
       { id: 'ocean', type: 'fill', source: 'water', 'source-layer': 'water',
         filter: ['==', ['get', 'class'], 'ocean'],
         paint: { 'fill-color': SEA_FLAT } },
-      { id: 'lake', type: 'fill', source: 'water', 'source-layer': 'water',
-        filter: ['!=', ['get', 'class'], 'ocean'],
+      {
+        // **호수와 강의 수면만.** 처음에 `class != ocean` 으로 두었더니
+        // `pond`·`swimming_pool`·`dock` 까지 끌려와, 벧산·이스르엘 골짜기의
+        // **현대 양어장과 저수지가 파란 격자로 온 들판을 덮었다.**
+        // 성경 시대 지도에 20세기 양식장을 그리는 셈이다.
+        //
+        // 버전 2 는 이 함정을 이미 피해 있었다 — `class == 'lake'` 로 **같음**을
+        // 썼다. 같은 실수를 되풀이하지 않는다.
+        id: 'lake', type: 'fill', source: 'water', 'source-layer': 'water',
+        filter: ['in', ['get', 'class'], ['literal', ['lake', 'river']]],
         paint: { 'fill-color': SEA_FLAT } },
       { id: 'water-edge', type: 'line', source: 'water', 'source-layer': 'water',
         minzoom: 6,
+        // 테두리도 같은 잣대로 — 양어장 테두리를 그리면 없앤 뜻이 없다.
+        filter: ['in', ['get', 'class'], ['literal', ['lake', 'river', 'ocean']]],
         paint: { 'line-color': '#2a6aa5', 'line-width': 0.6, 'line-opacity': 0.55 } },
       { id: 'river', type: 'line', source: 'water', 'source-layer': 'waterway',
         minzoom: 5,
-        // 마른 와디까지 다 굵게 그으면 광야가 물길로 덮인다. 늘 흐르는 것과
-        // 간헐천(intermittent)을 갈라 놓는다 — 성경 무대에서는 이 구분이 크다.
-        filter: ['in', ['get', 'class'], ['literal', ['river', 'canal', 'stream']]],
+        // **운하를 그리지 않는다.** OSM 의 `canal` 은 대부분 현대 관개수로다 —
+        // 애굽 삼각주와 메소포타미아에서 특히 심해서, 그리면 고대 무대가
+        // 20세기 수로망으로 덮인다. `stream` 도 뺀다: 대부분 마른 와디인데
+        // 선으로 그으면 광야가 물길로 덮인다.
+        //
+        // 간헐천은 남기되 옅은 선으로 둔다 — 성경 무대에서 늘 흐르는 물과
+        // 겨울에만 흐르는 물의 구분은 그 자체로 중요한 정보다.
+        filter: ['==', ['get', 'class'], 'river'],
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: {
           'line-color': '#5a90c0',
           'line-opacity': ['case', ['==', ['get', 'intermittent'], 1], 0.45, 1],
-          'line-width': ['interpolate', ['linear'], ['zoom'],
-            5, ['case', ['==', ['get', 'class'], 'river'], 0.6, 0],
-            10, ['case', ['==', ['get', 'class'], 'river'], 1.6, 0.6],
-            14, ['case', ['==', ['get', 'class'], 'river'], 3.0, 1.2]],
+          'line-width': ['interpolate', ['linear'], ['zoom'], 5, 0.6, 10, 1.6, 14, 3.0],
         } },
       // 등고선이 맨 위다. 지금은 그 위에 올릴 것이 없다 — 지명을 뺐으므로.
       ...contourLayers(contour),
