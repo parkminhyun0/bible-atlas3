@@ -15,7 +15,7 @@
       "caption_note": "이 구역의 DEM 은 이름만 10 m 이고 실제 센서 해상도는 30 m 다 (Mapterhorn source-catalog/isr10 의 producer 표기). 양자화 눈금은 z12 에서 1/16 m.",
       "contour_interval_m": 50,
       "relief_m": 855.0,
-      "count": 144
+      "count": 236
     },
     {
       "id": "galilee",
@@ -32,7 +32,7 @@
       "caption_note": "예루살렘과 같은 자료다. 명목 10 m · 실제 30 m.",
       "contour_interval_m": 50,
       "relief_m": 649.0,
-      "count": 88
+      "count": 157
     }
   ]
 }

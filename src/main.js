@@ -12,6 +12,9 @@ import { renderLegend } from './ui/legend.js';
 import { banner, clearBanner } from './ui/banner.js';
 import { drawStarfield, starOpacityForZoom } from './ui/starfield.js';
 import { prepareContours } from './map/contours.js';
+import { showPopup, hidePopup } from './ui/popup.js';
+import { showGroundBar, hideGroundBar } from './ui/groundbar.js';
+import { enterGroundView, turn } from './map/groundview.js';
 
 const AOI_URL = new URL('data/aoi/index.json', location.href);
 
@@ -58,6 +61,13 @@ function start(aoi, contour) {
     // 그 자리를 보려는 것이지 연출을 보려는 것이 아니다.
     zoom: location.hash ? aoi.zoom : 0.35,
     maxZoom: aoi.dem_max_zoom + 2,   // 자료가 없는 줌까지 열어 두지 않는다
+    // **기본으로 기울여 둔다.** 기울기 0 이면 3D 지형을 걸어 놓고도 평면으로
+    // 보인다 — 기울이려면 오른쪽 드래그를 해야 하는데 그것을 아는 사람은 드물다.
+    // 주소에 pitch 가 있으면 그쪽이 이긴다.
+    pitch: 55,
+    // 85° 까지 연다. 기본 상한(60°)으로는 '서서 보기' 가 불가능하다 —
+    // 눈높이 시점은 거의 수평이다.
+    maxPitch: 85,
     hash: true,
     // 한글 라벨은 기기 글꼴로 그린다 — 글리프 서버에 한글을 요구하지 않는다.
     localIdeographFontFamily: "'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif",
@@ -118,6 +128,22 @@ function start(aoi, contour) {
     window.addEventListener('resize', () => { drawStarfield(stars); syncStars(); });
   }
 
+  // ── 2층 · 자리 ────────────────────────────────────────────────────
+  //
+  // 점 하나는 "여기다" 라고 말한다. 그러나 자료가 실제로 말하는 것은
+  // "여기라고 보는 견해가 있고, 다른 후보가 몇 곳 있다" 이다.
+  // 눌러서 볼 수 있어야 그 차이가 전달된다.
+  const HIT = ['place-dot', 'alt-dot'];
+  map.on('click', e => {
+    const hits = map.queryRenderedFeatures(e.point, { layers: HIT });
+    if (!hits.length) return hidePopup();
+    showPopup(hits[0], { onStand: (lngLat, name) => goGround(map, lngLat, name) });
+  });
+  for (const id of HIT) {
+    map.on('mouseenter', id, () => { map.getCanvas().style.cursor = 'pointer'; });
+    map.on('mouseleave', id, () => { map.getCanvas().style.cursor = ''; });
+  }
+
   // WebGL 문맥이 날아가면 흰 화면만 남는다. 무슨 일인지 말해 준다.
   map.getCanvas().addEventListener('webglcontextlost', ev => {
     ev.preventDefault();
@@ -126,6 +152,37 @@ function start(aoi, contour) {
 
   window.__map = map;   // 콘솔에서 레이어를 하나씩 끄며 범인을 좁히기 위해
   return map;
+}
+
+/**
+ * 서서 보기로 들어간다 — **이것이 이 지도의 핵심이다.**
+ *
+ * 위에서 내려다보는 지도는 "어디에 있는가" 에 답한다. 그러나 성경을 읽는 사람이
+ * 묻는 것은 흔히 "거기 서면 무엇이 보이는가" 다 — 감람산에서 성전 터가 보이는가,
+ * 기드론 골짜기가 얼마나 깊은가. 기울이는 것만으로는 여전히 위에서 보는 눈이다.
+ */
+async function goGround(map, lngLat, name) {
+  banner(`${name} 에 서는 중…`);
+  let bearing = 90;
+  const ok = await enterGroundView(map, lngLat, bearing);
+  if (!ok) {
+    banner('지형 자료가 아직 도착하지 않아 서지 못했습니다. 잠시 뒤 다시 눌러 주세요.',
+           'error');
+    return;
+  }
+  clearBanner();
+  hidePopup();
+  showGroundBar({
+    where: name,
+    bearing,
+    onTurn: b => { bearing = b; turn(map, lngLat, b); },
+    onExit: () => {
+      hideGroundBar();
+      // 위에서 볼 때는 과장을 다시 건다. 서서 볼 때만 1.0× 였다.
+      map.setTerrain({ source: 'terrain', exaggeration: TERRAIN_EXAGGERATION });
+      map.easeTo({ center: lngLat, zoom: 13, pitch: 55, duration: 900 });
+    },
+  });
 }
 
 loadAoi(new URLSearchParams(location.search).get('aoi'))

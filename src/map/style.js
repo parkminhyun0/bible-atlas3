@@ -157,10 +157,58 @@ export function buildStyle({ demUrl, placesUrl, demMaxZoom = 13, contour = null 
       // 등고선은 물 위, 지명 아래. 물을 가리지 않고 지명에 가리지 않는다.
       ...contourLayers(contour),
       {
+        // **대안 후보를 잇는 실.** 으뜸에서 각 후보로 가는 선이 없으면 두 점이
+        // 무관해 보인다. 같은 이름을 두고 학계가 갈린 자리라는 것을 선이 말한다.
+        id: 'alt-link',
+        type: 'line',
+        source: 'places',
+        minzoom: 9,
+        filter: ['==', ['get', 'is_alt'], 1],
+        paint: { 'line-color': '#8c3a22', 'line-opacity': 0.25, 'line-width': 1 },
+      },
+      {
+        // 대안 후보. 으뜸보다 **작고 속이 비었다** — 대안은 대안이다.
+        // 크기·채움으로 갈라 놓되 색은 같이 쓴다(같은 것을 가리키는 후보이므로).
+        id: 'alt-dot',
+        type: 'circle',
+        source: 'places',
+        minzoom: 9,
+        filter: ['==', ['get', 'is_alt'], 1],
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 2.2, 14, 4],
+          'circle-color': 'rgba(255,255,255,0.85)',
+          'circle-stroke-color': '#8c3a22',
+          'circle-stroke-width': 1.1,
+          'circle-opacity': 0.9,
+        },
+      },
+      {
+        id: 'alt-label',
+        type: 'symbol',
+        source: 'places',
+        minzoom: 12,
+        filter: ['==', ['get', 'is_alt'], 1],
+        layout: {
+          'text-field': ['get', 'ko'],
+          'text-font': ['Noto Sans Regular'],
+          'text-size': 10,
+          'text-offset': [0, 0.8],
+          'text-anchor': 'top',
+          'text-allow-overlap': false,
+          'text-padding': 2,
+        },
+        paint: {
+          'text-color': '#7a5c4e',
+          'text-halo-color': '#f4f1ea',
+          'text-halo-width': 1.2,
+        },
+      },
+      {
         id: 'place-dot',
         type: 'circle',
         source: 'places',
         minzoom: 5,
+        filter: ['!=', ['get', 'is_alt'], 1],
         paint: {
           'circle-radius': ['interpolate', ['linear'], ['zoom'], 6, 3, 12, 5.5],
           // 흰 점 + 얇은 테두리는 밝은 음영기복 위에서 사실상 보이지 않는다.
