@@ -7,7 +7,8 @@ import { RELIEF_TICKS, colorAt } from '../map/palette.js';
  * 22번 문서가 요구하는 정직성 캡션 6항목의 자리도 여기에 둔다 —
  * 기법 · 커널 · 스트레치 · 과장 · 원 해상도 vs 표시 해상도 · 잡음 바닥.
  */
-export function renderLegend({ exaggeration, sourceRes, shownRes, note }) {
+export function renderLegend({ exaggeration, sourceRes, shownRes, note,
+                               contourInterval = null, reliefM = null }) {
   const el = document.getElementById('legend');
   if (!el) return;
   const rows = LEGEND.map(r => `
@@ -27,11 +28,23 @@ export function renderLegend({ exaggeration, sourceRes, shownRes, note }) {
     <div class="legend-title">고도</div>
     <div class="relief-band" style="background:linear-gradient(90deg,${band.join(',')})"></div>
     <div class="relief-ticks">${ticks}</div>
+    ${contourInterval ? `
+    <div class="legend-title" style="margin-top:12px">등고선</div>
+    <div class="legend-row">
+      <span class="swatch" style="border-top-width:2px"></span>
+      <span>굵은 선 <small>${contourInterval * 5} m 마다</small></span>
+    </div>
+    <div class="legend-row">
+      <span class="swatch" style="border-top-width:1px"></span>
+      <span>가는 선 <small>${contourInterval} m 마다</small></span>
+    </div>` : ''}
     <div class="legend-title" style="margin-top:12px">자리의 확실성</div>
     ${rows}
     <div class="legend-row"><span>이름 뒤 <b>?</b></span> <small>동일시가 갈린다</small></div>
     <div class="caption">
       음영 과장 ${exaggeration}× · 원 자료 ${sourceRes} · 표시 ${shownRes}<br>
+      ${contourInterval ? `등고선 간격 ${contourInterval} m — 이 구역에서 실측한 기복
+        ${reliefM} m 에 맞춘 값이고 <b>지역마다 다르다</b>(바벨론 5 m · 시내 100 m).<br>` : ''}
       ${note}
     </div>`;
   el.hidden = false;

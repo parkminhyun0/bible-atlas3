@@ -8,6 +8,7 @@
 
 import { dashExpression } from '../lib/certainty.js';
 import { LEVANT_RELIEF } from './palette.js';
+import { contourLayers } from './contours.js';
 
 /** Terrarium 인코딩. `R*256 + G + B/256 - 32768`. */
 export const TERRARIUM = {
@@ -30,8 +31,9 @@ export const TERRARIUM = {
  * @param {string} opts.demUrl   DEM 타일 주소 틀
  * @param {string} opts.placesUrl 구운 지명 자료 주소
  * @param {number} opts.demMaxZoom 이 지역에 실제로 있는 최대 줌
+ * @param {{url:string,maxzoom:number}|null} opts.contour 등고선 소스. 없으면 없는 채로 그린다
  */
-export function buildStyle({ demUrl, placesUrl, demMaxZoom = 13 }) {
+export function buildStyle({ demUrl, placesUrl, demMaxZoom = 13, contour = null }) {
   return {
     version: 8,
     // **구형 지구.** 버전 1·2 가 하던 것이고 V3 도 이것으로 간다.
@@ -95,6 +97,10 @@ export function buildStyle({ demUrl, placesUrl, demMaxZoom = 13 }) {
         // **AOI 전체(수천 건)로 넘어가면 타일로 바꾼다** — 그 경계는 측정해서 정한다.
         maxzoom: 14,
       },
+      // 등고선은 **처음부터 스타일 안에** 둔다. 버전 2 는 켤 때 addSource 를
+      // 불렀다가 스타일 로딩과 경합해 라이브에서 끝내 켜지지 않았다.
+      ...(contour ? { contours: { type: 'vector', tiles: [contour.url],
+                                  maxzoom: contour.maxzoom } } : {}),
     },
     layers: [
       { id: 'bg', type: 'background', paint: { 'background-color': '#f4f1ea' } },
@@ -148,6 +154,8 @@ export function buildStyle({ demUrl, placesUrl, demMaxZoom = 13 }) {
             10, ['case', ['==', ['get', 'class'], 'river'], 1.6, 0.6],
             14, ['case', ['==', ['get', 'class'], 'river'], 3.0, 1.2]],
         } },
+      // 등고선은 물 위, 지명 아래. 물을 가리지 않고 지명에 가리지 않는다.
+      ...contourLayers(contour),
       {
         id: 'place-dot',
         type: 'circle',

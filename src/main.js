@@ -11,6 +11,7 @@ import { buildStyle } from './map/style.js';
 import { renderLegend } from './ui/legend.js';
 import { banner, clearBanner } from './ui/banner.js';
 import { drawStarfield, starOpacityForZoom } from './ui/starfield.js';
+import { prepareContours } from './map/contours.js';
 
 const AOI_URL = new URL('data/aoi/index.json', location.href);
 
@@ -42,10 +43,11 @@ async function loadAoi(name) {
   return aoi;
 }
 
-function start(aoi) {
+function start(aoi, contour) {
   const map = new maplibregl.Map({
     container: 'map',
     style: buildStyle({
+      contour,
       demUrl: aoi.dem_url,
       placesUrl: new URL(aoi.places, AOI_URL).href,
       demMaxZoom: aoi.dem_max_zoom,
@@ -75,6 +77,10 @@ function start(aoi) {
     exaggeration: 0.5,
     sourceRes: aoi.source_res,
     shownRes: `z${aoi.dem_max_zoom} 까지`,
+    // **등고선 간격을 화면이 밝힌다.** 간격을 모르면 등고선은 무늬일 뿐이다.
+    // 값은 이 AOI 에서 실측한 것이고 지역마다 다르다(바벨론 5 m ~ 시내 100 m).
+    contourInterval: contour ? aoi.contour_interval_m : null,
+    reliefM: aoi.relief_m,
     note: aoi.caption_note || '',
   });
   // **`load` 가 아니라 `styledata` 에 건다.**
@@ -123,5 +129,16 @@ function start(aoi) {
 }
 
 loadAoi(new URLSearchParams(location.search).get('aoi'))
-  .then(start)
+  .then(async aoi => {
+    // 등고선 생성기는 **지도를 만들기 전에** 준비한다. 그래야 스타일 안에 넣을 수
+    // 있고, 버전 2 가 겪은 "Style is not done loading" 경합이 아예 생기지 않는다.
+    // 실패하면 null 이 오고, 등고선 없이 그린다 — 등고선 하나로 지도를 못 띄우면
+    // 안 된다.
+    const contour = await prepareContours({
+      demUrl: aoi.dem_url,
+      demMaxZoom: aoi.dem_max_zoom,
+      intervalM: aoi.contour_interval_m,
+    });
+    return start(aoi, contour);
+  })
   .catch(err => banner(`띄우지 못했습니다 — ${err.message}`, 'error'));
