@@ -40,6 +40,24 @@ cd ~/bibleatlas3 && python3 -m http.server 8080
 
 `http://localhost:8080` 을 연다.
 
+## 배포한 뒤 최대 10분은 옛 화면이 보인다
+
+GitHub Pages 는 `Cache-Control: max-age=600` 을 보낸다. `scripts/stamp_version.py`
+가 모듈 주소에 `?v=<해시>` 를 찍어 **모듈**은 바로 새것을 받지만,
+**`index.html` 자체가 캐시되어** 그 안의 옛 도장을 10분 동안 계속 가리킨다.
+
+그래서 배포 직후 화면이 그대로여도 실패가 아니다. 확인하려면 서버의 것을 본다:
+
+```js
+// 브라우저 콘솔에서 — 페이지가 쓰는 도장과 서버의 도장을 맞대어 본다
+const page = document.querySelector('script[type=module]').src.match(/v=(\w+)/)[1];
+const html = await (await fetch('index.html', {cache:'reload'})).text();
+console.log(page, html.match(/main\.js\?v=(\w+)/)[1]);
+```
+
+두 값이 다르면 **서버에는 새것이 있고 브라우저가 옛것을 쥐고 있는 것**이다.
+강제 새로고침(Cmd+Shift+R)하거나 기다리면 된다.
+
 ## 설계 문서
 
 노션 `BibleAtlas 3 · 실사 3D 데이터 제작 센터` 아래 09~22번.
