@@ -21,7 +21,25 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
   border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px;
   max-width: min(320px, calc(100vw - 24px));
 }
-#legend { left: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); }
+/* 범례는 왼쪽으로 밀어 넣는다. 지형을 보는 화면에서 설명이 늘 자리를
+   차지하고 있으면 정작 볼 것을 가린다. */
+#legend {
+  left: 0; bottom: calc(12px + env(safe-area-inset-bottom));
+  border-left: 0; border-radius: 0 6px 6px 0;
+  transition: transform 260ms cubic-bezier(.4, 0, .2, 1);
+}
+#legend.is-closed { transform: translateX(calc(-100% + 0px)); }
+
+/* 여닫는 손잡이. 패널 바깥에 붙어 같이 움직인다 — 닫혀도 남아 있어야
+   다시 열 수 있다. */
+.legend-handle {
+  position: absolute; left: 100%; bottom: 10px;
+  width: 26px; height: 52px; border: 1px solid var(--line); border-left: 0;
+  border-radius: 0 6px 6px 0; background: var(--panel); color: var(--ink-soft);
+  cursor: pointer; font: inherit; font-size: 13px; line-height: 1;
+  display: flex; align-items: center; justify-content: center; padding: 0;
+}
+.legend-handle:hover { color: var(--ink); }
 #banner { left: 12px; right: 12px; top: calc(12px + env(safe-area-inset-top)); }
 #banner[data-kind="error"] { border-color: #b4441f; }
 
