@@ -42,7 +42,7 @@ function opacityExpr(year, base) {
  * @param {object} map
  * @param {{enabled:boolean, year:number}} state
  */
-export function applyTimeFilter(map, { enabled, year }) {
+export function applyTimeFilter(map, { enabled, year }, features = null) {
   if (!map.getLayer('place-dot')) return null;
 
   if (!enabled) {
@@ -66,17 +66,20 @@ export function applyTimeFilter(map, { enabled, year }) {
     map.setPaintProperty('alt-label', 'text-opacity', UNKNOWN_OPACITY);
     map.setPaintProperty('alt-link', 'line-opacity', UNKNOWN_OPACITY * 0.5);
   }
-  return countAt(map, year);
+  return countAt(features, year);
 }
 
 /**
  * 그 해의 숫자를 센다. **세 값을 다 보인다** — 모르는 곳이 몇인지가
  * 가장 중요한 정보다.
+ *
+ * 자료는 **우리가 들고 있는 것**을 센다. 처음에는 `source._data` 를 읽었는데
+ * 그것은 사설 필드라 MapLibre 6 에서 비어 있었고, 숫자가 조용히 빈 칸으로
+ * 나왔다 — 오류도 나지 않았다. 남의 속을 들여다보는 코드는 이렇게 조용히 죽는다.
  */
-export function countAt(map, year) {
-  const src = map.getSource('places');
-  if (!src || !src._data) return null;
-  const feats = (src._data.features || []).filter(f => !f.properties?.is_alt);
+export function countAt(features, year) {
+  if (!Array.isArray(features)) return null;
+  const feats = features.filter(f => !f.properties?.is_alt);
   let present = 0, absent = 0, unknown = 0;
   for (const f of feats) {
     const p = f.properties || {};

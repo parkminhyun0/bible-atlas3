@@ -48,13 +48,15 @@ async function loadAoi(name) {
   return aoi;
 }
 
-function start(aoi, contour) {
+function start(aoi, contour, placesData) {
   const map = new maplibregl.Map({
     container: 'map',
     style: buildStyle({
       contour,
       demUrl: aoi.dem_url,
-      placesUrl: new URL(aoi.places, AOI_URL).href,
+      // 자료를 **주소가 아니라 객체로** 넘긴다. 시대 숫자를 세려면 우리도
+      // 그 자료를 들고 있어야 하는데, 두 번 받을 까닭이 없다.
+      placesUrl: placesData,
       demMaxZoom: aoi.dem_max_zoom,
     }),
     center: aoi.center,
@@ -155,7 +157,7 @@ function start(aoi, contour) {
   // 그래서 연대를 모르는 곳은 숨기지 않고 옅게 두고, 숫자를 항상 함께 보인다.
   mountTimeline({
     onChange: ({ enabled, year, setCount }) => {
-      const c = applyTimeFilter(map, { enabled, year });
+      const c = applyTimeFilter(map, { enabled, year }, placesData.features);
       if (!enabled || !c) { setCount(''); return; }
       setCount(`${yearKo(year)} — 있었다고 확인된 곳 ${c.present} · ` +
                `그때는 없던 곳 ${c.absent} · 연대를 모르는 곳 ${c.unknown}`);
@@ -217,6 +219,11 @@ loadAoi(new URLSearchParams(location.search).get('aoi'))
       demMaxZoom: aoi.dem_max_zoom,
       intervalM: aoi.contour_interval_m,
     });
-    return start(aoi, contour);
+    // 지명 자료를 여기서 한 번 받는다. 스타일에 객체로 넘기고, 시대 숫자도
+    // 이것으로 센다.
+    const res = await fetch(new URL(aoi.places, AOI_URL));
+    if (!res.ok) throw new Error(`지명 자료를 읽지 못했다 (HTTP ${res.status})`);
+    const placesData = await res.json();
+    return start(aoi, contour, placesData);
   })
   .catch(err => banner(`띄우지 못했습니다 — ${err.message}`, 'error'));
