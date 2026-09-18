@@ -96,8 +96,11 @@ export function buildStyle({ demUrl, demMaxZoom = 13, contour = null }) {
     },
     layers: [
       { id: 'bg', type: 'background',
-        // 바다색으로 깔아 둔다. 육지 고도색이 그 위를 덮는다.
-        paint: { 'background-color': SEA_FLAT } },
+        // **바다색으로 깔지 않는다.** 처음에 그렇게 했더니 타일이 들어오기 전
+        // 화면이 통째로 파랬다 — 아직 아무것도 못 그렸는데 "여기는 바다" 라고
+        // 말하는 셈이다. 바다는 해저색(bathy)과 해안선 도형(OSM)이 그린다.
+        // 이 색은 "아직 아무것도 없다" 를 뜻하는 중립색이다.
+        paint: { 'background-color': '#efece4' } },
       {
         // **고도색.** `color-relief` 는 DEM 값을 그대로 색으로 바꾼다 —
         // 우리가 따로 구울 것이 없다. 배색은 palette.js 에 있고 버전 2 의 값을
