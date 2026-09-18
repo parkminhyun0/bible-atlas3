@@ -99,12 +99,6 @@ export function buildStyle({ demUrl, demMaxZoom = 13, contour = null }) {
         // 바다색으로 깔아 둔다. 육지 고도색이 그 위를 덮는다.
         paint: { 'background-color': SEA_FLAT } },
       {
-        // 해저 깊이색. **-800 m 아래로만** 칠한다(palette.js ② 참고) —
-        // 고도만 보고 칠하면 요단 지구대(-430 m)까지 바다가 된다.
-        id: 'bathy', type: 'color-relief', source: 'bathy', maxzoom: 8,
-        paint: { 'color-relief-color': BATHY_RAMP },
-      },
-      {
         // **고도색.** `color-relief` 는 DEM 값을 그대로 색으로 바꾼다 —
         // 우리가 따로 구울 것이 없다. 배색은 palette.js 에 있고 버전 2 의 값을
         // 물려받았다(저채도 세이지 → 황토 → 회갈 → 설선).
@@ -123,6 +117,17 @@ export function buildStyle({ demUrl, demMaxZoom = 13, contour = null }) {
             0, 1, 8, 0.9, 12, 0.55, 14, 0.4,
           ],
         },
+      },
+      {
+        // 해저 깊이색. **-800 m 아래로만** 칠한다(palette.js ② 참고) —
+        // 고도만 보고 칠하면 요단 지구대(-430 m)까지 바다가 된다.
+        //
+        // **고도색보다 위에 둔다.** 아래에 두면 덮인다 — 바다 위 DEM 은 0 m 라
+        // 고도색이 그것을 육지색(#c8d2a2)으로 칠해 버리기 때문이다. 실제로
+        // 지중해 전체가 세이지색으로 나왔고, OSM 바다 타일이 들어온 조각만
+        // 파랗게 보였다. 순서가 곧 뜻이다.
+        id: 'bathy', type: 'color-relief', source: 'bathy', maxzoom: 8,
+        paint: { 'color-relief-color': BATHY_RAMP },
       },
       {
         // **음영기복은 물보다 아래에 둔다.** 위에 두면 물을 회색으로 덮는다 —
