@@ -1,13 +1,19 @@
 /**
  * 스타일을 **자료로** 다룬다.
  *
+ * ## 지금은 지명을 그리지 않는다 (2026-09-18)
+ *
+ * 박 목사님 지시. **좌표를 정확히 넣기 전에는 지명을 올리지 않는다.**
+ * 지금 핵심은 지질·지형·등고선·고도 표현이 사실적으로 만들어지는 것이고,
+ * 자리가 불확실한 점을 먼저 뿌리면 그 위에 올릴 땅이 흐려진다.
+ * 지명을 굽는 스크립트(`build_aoi.py`)와 자료는 그대로 남겨 두었다.
+ *
  * 버전 2 는 스타일이 코드 안에 박혀 있어서, 화면이 이상할 때 레이어를 하나씩 끄며
  * 범인을 좁히는 일이 불가능했다. 여기서는 스타일이 그냥 객체이므로
  * `layers.filter(...)` 로 반을 잘라 이분탐색할 수 있다.
  */
 
-import { dashExpression } from '../lib/certainty.js';
-import { LEVANT_RELIEF } from './palette.js';
+import { LEVANT_RELIEF, BATHY_RAMP, SEA_FLAT, BASE_SKY } from './palette.js';
 import { contourLayers } from './contours.js';
 
 /** Terrarium 인코딩. `R*256 + G + B/256 - 32768`. */
@@ -29,11 +35,10 @@ export const TERRARIUM = {
 /**
  * @param {object} opts
  * @param {string} opts.demUrl   DEM 타일 주소 틀
- * @param {string} opts.placesUrl 구운 지명 자료 주소
  * @param {number} opts.demMaxZoom 이 지역에 실제로 있는 최대 줌
  * @param {{url:string,maxzoom:number}|null} opts.contour 등고선 소스. 없으면 없는 채로 그린다
  */
-export function buildStyle({ demUrl, placesUrl, demMaxZoom = 13, contour = null }) {
+export function buildStyle({ demUrl, demMaxZoom = 13, contour = null }) {
   return {
     version: 8,
     // **구형 지구.** 버전 1·2 가 하던 것이고 V3 도 이것으로 간다.
@@ -42,22 +47,7 @@ export function buildStyle({ demUrl, placesUrl, demMaxZoom = 13, contour = null 
     projection: { type: 'globe' },
     // 하늘·대기·안개. 지구 밖 빈 곳의 색이 여기서 정해진다.
     // MapLibre 6 에는 `star-intensity` 가 없으므로 별은 우리가 따로 그린다.
-    sky: {
-      'sky-color': '#0a1330',
-      'sky-horizon-blend': 0.55,
-      'horizon-color': '#8fb2d8',
-      'horizon-fog-blend': 0.6,
-      'fog-color': '#d8e2ee',
-      'fog-ground-blend': 0.7,
-      // 0 이면 우주에서도 대기가 안 보이고, 1 이면 지표에서도 뿌옇다.
-      'atmosphere-blend': [
-        'interpolate', ['linear'], ['zoom'],
-        0, 0.9,     // 우주 — 지구 가장자리에 파란 테가 선다
-        4, 0.6,
-        8, 0.15,    // 지역 — 거의 걷힌다
-        12, 0,
-      ],
-    },
+    sky: BASE_SKY,
     // **글꼴 출처를 잘못 잡으면 라벨이 사라지는 데서 끝나지 않는다.**
     // 처음에 `demotiles.maplibre.org` 의 `Open Sans Regular` 를 썼는데 그곳에는
     // `Open Sans Semibold` 밖에 없다. 모든 글리프 범위가 404 를 내자 지도가
@@ -66,6 +56,16 @@ export function buildStyle({ demUrl, placesUrl, demMaxZoom = 13, contour = null 
     glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
     sources: {
       terrain: { ...TERRARIUM, tiles: [demUrl], maxzoom: demMaxZoom },
+      // **해저 지형.** Mapterhorn 은 육지만 담는다. 바다 깊이는 AWS Terrain Tiles
+      // (Terrarium)에서 온다. 저줌에서만 쓴다 — 확대하면 해안선 도형이 맡고,
+      // DEM 을 두 벌 해독하는 것이 아이폰을 죽이던 자리이기도 하다.
+      bathy: {
+        type: 'raster-dem', encoding: 'terrarium', tileSize: 256, maxzoom: 8,
+        tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
+        attribution:
+          '해저: <a href="https://registry.opendata.aws/terrain-tiles/">AWS Terrain Tiles</a> · ' +
+          'ETOPO1 (NOAA) · SRTM·GMTED2010 (USGS)',
+      },
       // 물. **고도만으로는 물과 마른 땅을 구분할 수 없어서** 따로 온다 —
       // 여리고는 -258 m 인데 마른 땅이다.
       //
@@ -89,30 +89,34 @@ export function buildStyle({ demUrl, placesUrl, demMaxZoom = 13, contour = null 
           '<a href="https://openfreemap.org">OpenFreeMap</a> · ' +
           '<a href="https://www.openmaptiles.org/">OpenMapTiles</a>',
       },
-      places: {
-        type: 'geojson',
-        data: placesUrl,
-        // 런타임에 큰 GeoJSON 을 파싱하지 않는 것이 원칙이지만, AOI 하나의
-        // 지명은 수백 건이라 이 크기에서는 타일보다 단순한 쪽이 낫다.
-        // **AOI 전체(수천 건)로 넘어가면 타일로 바꾼다** — 그 경계는 측정해서 정한다.
-        maxzoom: 14,
-      },
       // 등고선은 **처음부터 스타일 안에** 둔다. 버전 2 는 켤 때 addSource 를
       // 불렀다가 스타일 로딩과 경합해 라이브에서 끝내 켜지지 않았다.
       ...(contour ? { contours: { type: 'vector', tiles: [contour.url],
                                   maxzoom: contour.maxzoom } } : {}),
     },
     layers: [
-      { id: 'bg', type: 'background', paint: { 'background-color': '#f4f1ea' } },
+      { id: 'bg', type: 'background',
+        // 바다색으로 깔아 둔다. 육지 고도색이 그 위를 덮는다.
+        paint: { 'background-color': SEA_FLAT } },
+      {
+        // 해저 깊이색. **-800 m 아래로만** 칠한다(palette.js ② 참고) —
+        // 고도만 보고 칠하면 요단 지구대(-430 m)까지 바다가 된다.
+        id: 'bathy', type: 'color-relief', source: 'bathy', maxzoom: 8,
+        paint: { 'color-relief-color': BATHY_RAMP },
+      },
       {
         // **고도색.** `color-relief` 는 DEM 값을 그대로 색으로 바꾼다 —
-        // 우리가 따로 구울 것이 없다. 배색은 palette.js 에 있고 초록을 쓰지 않는다.
+        // 우리가 따로 구울 것이 없다. 배색은 palette.js 에 있고 버전 2 의 값을
+        // 물려받았다(저채도 세이지 → 황토 → 회갈 → 설선).
+        //
+        // **어디서나 불투명하다.** 0 m 를 투명하게 두면 DEM 이 '바다 0 m' 와
+        // '나일 삼각주 육지 0 m' 를 구분하지 못해 삼각주가 바다로 칠해진다.
         id: 'relief',
         type: 'color-relief',
         source: 'terrain',
         paint: {
           'color-relief-color': LEVANT_RELIEF,
-          // 멀리서는 또렷하게, 가까이서는 옅게 — 가까이서는 등고선과 지명이
+          // 멀리서는 또렷하게, 가까이서는 옅게 — 가까이서는 등고선이
           // 주인공이고 색은 배경이어야 한다(22번 문서의 공중원근).
           'color-relief-opacity': [
             'interpolate', ['linear'], ['zoom'],
@@ -133,13 +137,13 @@ export function buildStyle({ demUrl, placesUrl, demMaxZoom = 13, contour = null 
       // 물은 고도색과 음영기복 **위**에 온다.
       { id: 'ocean', type: 'fill', source: 'water', 'source-layer': 'water',
         filter: ['==', ['get', 'class'], 'ocean'],
-        paint: { 'fill-color': '#8fa9c4' } },
+        paint: { 'fill-color': SEA_FLAT } },
       { id: 'lake', type: 'fill', source: 'water', 'source-layer': 'water',
         filter: ['!=', ['get', 'class'], 'ocean'],
-        paint: { 'fill-color': '#8fa9c4' } },
+        paint: { 'fill-color': SEA_FLAT } },
       { id: 'water-edge', type: 'line', source: 'water', 'source-layer': 'water',
         minzoom: 6,
-        paint: { 'line-color': '#5f7d9c', 'line-width': 0.6, 'line-opacity': 0.6 } },
+        paint: { 'line-color': '#2a6aa5', 'line-width': 0.6, 'line-opacity': 0.55 } },
       { id: 'river', type: 'line', source: 'water', 'source-layer': 'waterway',
         minzoom: 5,
         // 마른 와디까지 다 굵게 그으면 광야가 물길로 덮인다. 늘 흐르는 것과
@@ -147,110 +151,15 @@ export function buildStyle({ demUrl, placesUrl, demMaxZoom = 13, contour = null 
         filter: ['in', ['get', 'class'], ['literal', ['river', 'canal', 'stream']]],
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: {
-          'line-color': '#7e9bb8',
+          'line-color': '#5a90c0',
           'line-opacity': ['case', ['==', ['get', 'intermittent'], 1], 0.45, 1],
           'line-width': ['interpolate', ['linear'], ['zoom'],
             5, ['case', ['==', ['get', 'class'], 'river'], 0.6, 0],
             10, ['case', ['==', ['get', 'class'], 'river'], 1.6, 0.6],
             14, ['case', ['==', ['get', 'class'], 'river'], 3.0, 1.2]],
         } },
-      // 등고선은 물 위, 지명 아래. 물을 가리지 않고 지명에 가리지 않는다.
+      // 등고선이 맨 위다. 지금은 그 위에 올릴 것이 없다 — 지명을 뺐으므로.
       ...contourLayers(contour),
-      {
-        // **대안 후보를 잇는 실.** 으뜸에서 각 후보로 가는 선이 없으면 두 점이
-        // 무관해 보인다. 같은 이름을 두고 학계가 갈린 자리라는 것을 선이 말한다.
-        id: 'alt-link',
-        type: 'line',
-        source: 'places',
-        minzoom: 9,
-        filter: ['==', ['get', 'is_alt'], 1],
-        paint: { 'line-color': '#8c3a22', 'line-opacity': 0.25, 'line-width': 1 },
-      },
-      {
-        // 대안 후보. 으뜸보다 **작고 속이 비었다** — 대안은 대안이다.
-        // 크기·채움으로 갈라 놓되 색은 같이 쓴다(같은 것을 가리키는 후보이므로).
-        id: 'alt-dot',
-        type: 'circle',
-        source: 'places',
-        minzoom: 9,
-        filter: ['==', ['get', 'is_alt'], 1],
-        paint: {
-          'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 2.2, 14, 4],
-          'circle-color': 'rgba(255,255,255,0.85)',
-          'circle-stroke-color': '#8c3a22',
-          'circle-stroke-width': 1.1,
-          'circle-opacity': 0.9,
-        },
-      },
-      {
-        id: 'alt-label',
-        type: 'symbol',
-        source: 'places',
-        minzoom: 12,
-        filter: ['==', ['get', 'is_alt'], 1],
-        layout: {
-          'text-field': ['get', 'ko'],
-          'text-font': ['Noto Sans Regular'],
-          'text-size': 10,
-          'text-offset': [0, 0.8],
-          'text-anchor': 'top',
-          'text-allow-overlap': false,
-          'text-padding': 2,
-        },
-        paint: {
-          'text-color': '#7a5c4e',
-          'text-halo-color': '#f4f1ea',
-          'text-halo-width': 1.2,
-        },
-      },
-      {
-        id: 'place-dot',
-        type: 'circle',
-        source: 'places',
-        minzoom: 5,
-        filter: ['!=', ['get', 'is_alt'], 1],
-        paint: {
-          'circle-radius': ['interpolate', ['linear'], ['zoom'], 6, 3, 12, 5.5],
-          // 흰 점 + 얇은 테두리는 밝은 음영기복 위에서 사실상 보이지 않는다.
-          // 실제로 갈릴리에서 80개가 그려졌는데도 화면에서는 한 개도 안 보였다.
-          'circle-color': '#8c3a22',
-          'circle-stroke-color': '#ffffff',
-          // 굵기는 확실성에 쓰지 않는다 — 전부 같다(FGDC 가 .375 mm 로 통일한 까닭).
-          'circle-stroke-width': 1.2,
-          // 정확도를 모르는 자리는 옅게 둔다. 실선으로 그리지 않는다.
-          'circle-opacity': ['case', ['has', 'accuracy_m'], 1, 0.55],
-        },
-      },
-      {
-        id: 'place-label',
-        type: 'symbol',
-        source: 'places',
-        minzoom: 6,
-        layout: {
-          // 정체가 불확실하면 라벨 뒤에 `?`. 자료가 아니라 스타일이 붙인다.
-          'text-field': ['concat', ['get', 'ko'],
-            ['case',
-              ['==', ['get', 'id_certainty'], 'uncertain'], ' ?',
-              ['==', ['get', 'id_certainty'], 'less-certain'], ' (?)',
-              '']],
-          // 이 출처에 실재하는 이름이어야 한다. 한글은 `localIdeographFontFamily`
-          // 가 기기 글꼴로 그리므로 여기에 한글 글꼴을 넣지 않는다.
-          'text-font': ['Noto Sans Regular'],
-          'text-size': ['interpolate', ['linear'], ['zoom'], 6, 10, 12, 13],
-          'text-offset': [0, 0.9],
-          'text-anchor': 'top',
-          // 라벨이 겹치면 키우지 않는다 — 22번 문서의 되먹임 규칙.
-          'text-allow-overlap': false,
-          'text-padding': 3,
-        },
-        paint: {
-          'text-color': '#222222',
-          'text-halo-color': '#f4f1ea',
-          'text-halo-width': 1.4,
-        },
-      },
     ],
-    // 참고용으로 남긴다 — 화면에 쓰지 않아도 규칙이 어디서 왔는지 보이게.
-    metadata: { 'bibleatlas:dash-rule': dashExpression },
   };
 }

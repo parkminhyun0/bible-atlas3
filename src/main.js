@@ -12,11 +12,9 @@ import { renderLegend } from './ui/legend.js';
 import { banner, clearBanner } from './ui/banner.js';
 import { drawStarfield, starOpacityForZoom } from './ui/starfield.js';
 import { prepareContours } from './map/contours.js';
-import { showPopup, hidePopup } from './ui/popup.js';
 import { showGroundBar, hideGroundBar } from './ui/groundbar.js';
+import { showSpot, hideSpot } from './ui/spot.js';
 import { enterGroundView, turn, trueElevationAt } from './map/groundview.js';
-import { mountTimeline, yearKo } from './ui/timeline.js';
-import { applyTimeFilter } from './map/timefilter.js';
 
 const AOI_URL = new URL('data/aoi/index.json', location.href);
 
@@ -48,15 +46,12 @@ async function loadAoi(name) {
   return aoi;
 }
 
-function start(aoi, contour, placesData) {
+function start(aoi, contour) {
   const map = new maplibregl.Map({
     container: 'map',
     style: buildStyle({
       contour,
       demUrl: aoi.dem_url,
-      // 자료를 **주소가 아니라 객체로** 넘긴다. 시대 숫자를 세려면 우리도
-      // 그 자료를 들고 있어야 하는데, 두 번 받을 까닭이 없다.
-      placesUrl: placesData,
       demMaxZoom: aoi.dem_max_zoom,
     }),
     center: aoi.center,
@@ -134,34 +129,23 @@ function start(aoi, contour, placesData) {
     window.addEventListener('resize', () => { drawStarfield(stars); syncStars(); });
   }
 
-  // ── 2층 · 자리 ────────────────────────────────────────────────────
+  // ── 땅을 눌러 본다 ────────────────────────────────────────────────
   //
-  // 점 하나는 "여기다" 라고 말한다. 그러나 자료가 실제로 말하는 것은
-  // "여기라고 보는 견해가 있고, 다른 후보가 몇 곳 있다" 이다.
-  // 눌러서 볼 수 있어야 그 차이가 전달된다.
-  const HIT = ['place-dot', 'alt-dot'];
+  // 지명을 빼 두었으므로 누를 것이 땅밖에 없다. 그리고 지금 핵심이 지형이니
+  // 그것이 옳다 — **누른 자리의 해발 고도를 읽고, 거기 설 수 있게 한다.**
+  //
+  // 고도는 반드시 **과장 1.0 기준**으로 읽는다. `queryTerrainElevation` 은
+  // 과장이 걸린 값을 돌려주므로(감람산 1.5× 에서 1,199 m · 1.0× 에서 801 m),
+  // 화면에 적을 때는 과장을 나눠 준다.
   map.on('click', e => {
-    const hits = map.queryRenderedFeatures(e.point, { layers: HIT });
-    if (!hits.length) return hidePopup();
-    showPopup(hits[0], { onStand: (lngLat, name) => goGround(map, lngLat, name) });
-  });
-  for (const id of HIT) {
-    map.on('mouseenter', id, () => { map.getCanvas().style.cursor = 'pointer'; });
-    map.on('mouseleave', id, () => { map.getCanvas().style.cursor = ''; });
-  }
-
-  // ── 3층 · 때 ──────────────────────────────────────────────────────
-  //
-  // "기원전 1000년의 지도" 를 그린다. 다만 연대를 아는 곳이 예루살렘 4% ·
-  // 갈릴리 24% 뿐이라, 거르는 순간 화면의 대부분이 **거짓 부재**가 된다.
-  // 그래서 연대를 모르는 곳은 숨기지 않고 옅게 두고, 숫자를 항상 함께 보인다.
-  mountTimeline({
-    onChange: ({ enabled, year, setCount }) => {
-      const c = applyTimeFilter(map, { enabled, year }, placesData.features);
-      if (!enabled || !c) { setCount(''); return; }
-      setCount(`${yearKo(year)} — 있었다고 확인된 곳 ${c.present} · ` +
-               `그때는 없던 곳 ${c.absent} · 연대를 모르는 곳 ${c.unknown}`);
-    },
+    const raw = map.queryTerrainElevation(e.lngLat);
+    if (typeof raw !== 'number' || !isFinite(raw)) {
+      showSpot(null, e.lngLat, () => {});
+      return;
+    }
+    const m = raw / TERRAIN_EXAGGERATION;
+    showSpot(m, e.lngLat, () => goGround(map, [e.lngLat.lng, e.lngLat.lat],
+                                         `해발 ${Math.round(m)} m 지점`));
   });
 
   // WebGL 문맥이 날아가면 흰 화면만 남는다. 무슨 일인지 말해 준다.
@@ -191,7 +175,7 @@ async function goGround(map, lngLat, name) {
     return;
   }
   clearBanner();
-  hidePopup();
+  hideSpot();
   // 고도는 **과장 1.0 기준**으로 읽은 값이다. 서서 보기는 과장을 되돌린 뒤
   // 서므로 그대로 적어도 된다 — 과장이 걸린 값을 적으면 거짓말이 된다.
   const elev = trueElevationAt(map, lngLat);
@@ -219,11 +203,6 @@ loadAoi(new URLSearchParams(location.search).get('aoi'))
       demMaxZoom: aoi.dem_max_zoom,
       intervalM: aoi.contour_interval_m,
     });
-    // 지명 자료를 여기서 한 번 받는다. 스타일에 객체로 넘기고, 시대 숫자도
-    // 이것으로 센다.
-    const res = await fetch(new URL(aoi.places, AOI_URL));
-    if (!res.ok) throw new Error(`지명 자료를 읽지 못했다 (HTTP ${res.status})`);
-    const placesData = await res.json();
-    return start(aoi, contour, placesData);
+    return start(aoi, contour);
   })
   .catch(err => banner(`띄우지 못했습니다 — ${err.message}`, 'error'));

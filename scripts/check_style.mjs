@@ -16,7 +16,6 @@ import { buildStyle } from '../src/map/style.js';
 
 const BASE = {
   demUrl: 'https://tiles.example/{z}/{x}/{y}.webp',
-  placesUrl: 'https://example/places.json',
   demMaxZoom: 13,
 };
 
@@ -44,36 +43,9 @@ for (const [label, opts] of variants) {
   failed += errs.length + noMax.length;
 }
 
-// ── 런타임에 갈아 끼우는 칠 ────────────────────────────────────────────
-//
-// 실제 스타일에 그 표현식을 심어 넣고 통째로 검사한다. 표현식만 따로 검사하는
-// 공개 API 가 마땅치 않아, 스타일 검사기를 그대로 쓴다 — 어차피 같은 길이다.
-{
-  const { applyTimeFilter } = await import('../src/map/timefilter.js');
-  const st = buildStyle(BASE);
-  const byId = Object.fromEntries(st.layers.map(l => [l.id, l]));
-
-  // `applyTimeFilter` 가 지도에 하는 일을 그대로 흉내 내는 가짜 지도.
-  const fake = {
-    getLayer: id => byId[id],
-    getSource: () => null,
-    setPaintProperty(id, prop, value) {
-      if (!byId[id]) throw new Error(`없는 레이어에 칠을 걸었다: ${id}`);
-      byId[id].paint = { ...(byId[id].paint || {}), [prop]: value };
-    },
-  };
-
-  for (const [label, state] of [
-    ['시대 끔', { enabled: false, year: -1000 }],
-    ['시대 켬 BC 1000', { enabled: true, year: -1000 }],
-  ]) {
-    applyTimeFilter(fake, state);
-    const errs = validateStyleMin(st);
-    console.log('%s — 검사', label);
-    for (const e of errs) console.error('  ✗ %s', e.message);
-    failed += errs.length;
-  }
-}
+// 지명과 시대 슬라이더는 지금 쓰지 않는다(2026-09-18, 좌표를 정확히 넣기 전까지).
+// 다시 켤 때 이 자리에 런타임 칠 검사를 되살린다 — 스타일만 검사하면
+// setPaintProperty 로 갈아 끼우는 표현식이 그대로 빠져나간다.
 
 console.log(failed ? `실패 — 문제 ${failed}건` : '통과 — 문제 없음');
 process.exit(failed ? 1 : 0);
