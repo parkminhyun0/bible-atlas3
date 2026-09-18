@@ -43,7 +43,11 @@ function opacityExpr(year, base) {
  * @param {{enabled:boolean, year:number}} state
  */
 export function applyTimeFilter(map, { enabled, year }, features = null) {
-  if (!map.getLayer('place-dot')) return null;
+  // **숫자는 지도와 무관하게 센다.** 처음에는 레이어가 없으면 통째로 돌아섰는데,
+  // 그러면 스타일이 늦는 동안 슬라이더가 아무 말도 하지 않는다 — 켰는데 빈 칸이
+  // 나오는 것이 가장 나쁘다. 칠은 못 걸어도 숫자는 말할 수 있다.
+  const counted = enabled ? countAt(features, year) : null;
+  if (!map.getLayer || !map.getLayer('place-dot')) return counted;
 
   if (!enabled) {
     // 원래대로. 정확도를 모르는 자리를 옅게 두던 규칙으로 되돌린다.
@@ -66,7 +70,7 @@ export function applyTimeFilter(map, { enabled, year }, features = null) {
     map.setPaintProperty('alt-label', 'text-opacity', UNKNOWN_OPACITY);
     map.setPaintProperty('alt-link', 'line-opacity', UNKNOWN_OPACITY * 0.5);
   }
-  return countAt(features, year);
+  return counted;
 }
 
 /**
