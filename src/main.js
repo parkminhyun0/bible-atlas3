@@ -80,8 +80,24 @@ function start(aoi, contour) {
   map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
   map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-right');
 
-  // 조용히 실패하지 않게 한다.
-  map.on('error', e => banner(`지도 오류: ${e?.error?.message || '까닭 미상'}`, 'error'));
+  // 조용히 실패하지 않게 한다. **다만 타일 하나가 빈 것으로 놀라게 하지도 않는다.**
+  //
+  // 버전 2 가 배운 것을 내가 빠뜨렸다 — 타일 단위 오류(`sourceId` 가 붙는다)는
+  // 외부 서비스가 이따금 실패하거나 **그 자리에 자료가 없는** 것이고, 지도는
+  // 그래도 그려진다. 그것으로 붉은 배너를 띄우면 독자는 지도가 망가진 줄 안다.
+  //
+  // 실제로 겪었다: `404 for tiles.mapterhorn.com/13/...` — z13 타일은 우리 무대
+  // 어디에도 없는데(실측) AOI 명세가 13 을 요구하고 있었다. 명세는 12 로 고쳤고,
+  // 자료 경계 밖으로 나가면 여전히 404 가 나므로 그것은 조용히 넘긴다.
+  //
+  // `sourceId` 가 **없는** 오류는 스타일·표현식 결함이라 반드시 보여야 한다.
+  map.on('error', e => {
+    if (e?.sourceId) {
+      console.warn('[타일]', e.sourceId, e?.error?.message || e);
+      return;
+    }
+    banner(`지도 오류: ${e?.error?.message || '까닭 미상'}`, 'error');
+  });
   // **범례를 `load` 에 매달지 않는다.** 글꼴 하나가 404 나면 `load` 가 영영
   // 안 오는 일이 실제로 있었다(글꼴 출처를 잘못 잡았을 때). 그때 범례까지 같이
   // 사라지면 화면은 규칙 없는 그림이 된다. 범례는 지도와 무관한 DOM 이다.
