@@ -1,0 +1,25 @@
+{
+  "algorithm_details": {
+    "can_cancel": true,
+    "deprecated": false,
+    "group": "Vector geometry",
+    "has_known_issues": false,
+    "help_url": null,
+    "id": "native:checkvalidity",
+    "name": "Check validity",
+    "requires_matching_crs": false,
+    "short_description": "Performs a validity check on the geometries of a vector layer and classifies them in three groups (valid, invalid and error).",
+    "tags": [
+      "valid",
+      "invalid",
+      "detect",
+      "error"
+    ]
+  },
+  "qgis_version": "3.44.14-Solothurn",
+  "gdal_version": "3.13.3",
+  "proj_version": "Rel. 9.8.1, April 10th, 2026",
+  "geos_version": "3.14.1-CAPI-1.20.5",
+  "python_version": "3.12.11",
+  "qgis_code_revision": "536007b2"
+}

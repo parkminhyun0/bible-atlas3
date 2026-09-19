@@ -90,11 +90,14 @@ export function buildStyle({ demUrl, demMaxZoom = 13, contour = null,
           '<a href="https://openfreemap.org">OpenFreeMap</a> · ' +
           '<a href="https://www.openmaptiles.org/">OpenMapTiles</a>',
       },
-      // 우리가 고른 호수. Natural Earth 1:10m 에서 20세기 댐 저수지를 이름과
-      // 연대로 가려낸 것이다(build_water.py). 퍼블릭 도메인.
+      // 우리가 고른 호수. HydroLAKES v1.0 에서 무대만 잘라, **성경 시대에 없던
+      // 물을 빼고**, QGIS 로 깨진 도형을 고친 것이다(build_lakes.py ·
+      // qgis_polish_lakes.sh). 자세한 까닭은 PROVENANCE.md 10장.
       lakes: {
         type: 'geojson', data: lakesUrl, maxzoom: 12,
-        attribution: '호수: <a href="https://www.naturalearthdata.com/">Natural Earth</a> (퍼블릭 도메인)',
+        attribution:
+          '호수: <a href="https://www.hydrosheds.org/products/hydrolakes">HydroLAKES</a> ' +
+          '(Messager et al. 2016, CC BY 4.0)',
       },
       // 등고선은 **처음부터 스타일 안에** 둔다. 버전 2 는 켤 때 addSource 를
       // 불렀다가 스타일 로딩과 경합해 라이브에서 끝내 켜지지 않았다.
@@ -189,21 +192,20 @@ export function buildStyle({ demUrl, demMaxZoom = 13, contour = null,
         filter: ['==', ['get', 'class'], 'ocean'],
         paint: { 'fill-color': SEA_FLAT } },
       {
-        // **호수는 우리가 고른 것만 그린다.**
+        // **호수는 우리가 고른 것만 그린다.** 세 번 갈아탄 끝의 자리다.
         //
-        // OSM 을 쓰면 안 된다는 것을 실측으로 확인했다. 갈릴리 일대에서 호수로
-        // 분류된 279개 중 **269개가 1 km² 미만**이었다(중앙값 0.083 km² = 8헥타르).
-        // 벧산·이스르엘 골짜기의 양어장과 저수지다. 속성으로는 자연호와 구분되지
-        // 않는다 — OSM 은 저수지도 `lake` 로 분류한다.
+        // ① OSM — 매끄럽지만 **현대 양어장·저수지를 가릴 수 없다.** 갈릴리 일대
+        //    호수 279개 중 269개가 1 km² 미만이었다(중앙값 8헥타르).
+        // ② Natural Earth 1:10m — 큰 것만 주지만 **갈릴리와 사해가 직각으로
+        //    꺾였다.** 축척이 1:10,000,000 이라 위치 한계가 약 1 km 다.
+        // ③ **HydroLAKES** — 둘 다 푼다. 면적으로 거르고, `Lake_type` 으로
+        //    저수지를 가르고, 윤곽이 상세하다(갈릴리 211점 · 사해 625점).
         //
-        // 그래서 Natural Earth 1:10m 를 쓰고, 거기서 **20세기 댐 저수지를 이름과
-        // 연대로 가려냈다**(`build_water.py` 의 `MODERN_WATER`). 나세르호·앗사드호·
-        // 아타튀르크호 같은 것들은 성경 시대에 없던 물이고, 그리면 그 아래 잠긴
-        // 유적과 옛 물길을 지우는 일이 된다.
-        //
-        // 대가는 모양이 거칠어지는 것이다(1:10m 는 위치 한계 약 1 km).
-        // 갈릴리 호수 하나를 매끄럽게 그리는 것보다 **없던 물을 그리지 않는 것**이
-        // 이 지도에서는 더 중요하다.
+        // 거기서 다시 **성경 시대에 없던 물**을 이름과 연대로 뺐다 — 나세르호
+        // (1964~76, 누비아 수몰) · 앗사드호(1974) · 아타튀르크호(1992) ·
+        // Toshka(1998~2001) · 사해 남부 증발지(1960~80년대 공업용) 등 154개.
+        // 그것들을 그리면 없던 물을 그리는 것이고, 그 아래 잠긴 유적과 옛 물길을
+        // 지우는 일이기도 하다.
         id: 'lake', type: 'fill', source: 'lakes',
         paint: { 'fill-color': SEA_FLAT } },
       { id: 'lake-edge', type: 'line', source: 'lakes', minzoom: 6,
